@@ -4,6 +4,7 @@ Database and Schemas
 ==========================================
 Purpose: 
 	This script checks whether the "DataWarehouse" database already exists. If it does, it gets dropped and rebuilt from scratch. Afterwards, it sets up three layers within the database (bronze, silver, and gold) to organize the data as it moves through the pipeline.
+
 WARNING: 
 	Running this script will drop the entire "DataWarehouse" database if it already exists and ALL EXISTING DATA WILL BE DELETED!
 */

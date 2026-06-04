@@ -81,3 +81,14 @@ CREATE TABLE bronze_crm_interaction_info (
 	avg_handling_time INT,
 	csat INT
 );
+
+
+/* Load data from local desktop into the database */
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- nested folders on MacOS fixed via symlink on command line
+	INTO TABLE bronze_erp_customer_info_churn
+    FIELDS TERMINATED BY ","
+    LINES TERMINATED BY "\n"
+    IGNORE 1 LINES; -- first row has headers so ignore
+
+SHOW VARIABLES LIKE 'local_infile'; -- check local infile permissions exist
+SELECT * FROM bronze_erp_customer_info_churn LIMIT 20; -- return loaded data

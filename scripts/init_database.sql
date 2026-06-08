@@ -3,7 +3,7 @@
 Database and Schemas
 ==========================================
 Purpose: 
-	This script checks whether the "DataWarehouse" database already exists. If it does, it gets dropped and rebuilt from scratch. 
+	This script checks whether the "DataWarehouse" database already exists. If it does, it gets dropped and rebuilt from scratch.
 
 WARNING: 
 	Running this script will drop the entire "DataWarehouse" database if it already exists and ALL EXISTING DATA WILL BE DELETED!
@@ -15,7 +15,6 @@ USE master;
 DROP DATABASE IF EXISTS DataWarehouse; -- Drop the database if it already exists
 
 CREATE DATABASE DataWarehouse; -- Create data warehouse
-
 
 
 /* 
@@ -44,7 +43,7 @@ DROP TABLE IF EXISTS `bronze_erp_customer_info_churn`; -- Drop the table if it e
 CREATE TABLE bronze_erp_customer_info_churn (
 	customer_ID INT,
 	gender VARCHAR(8),
-	senior_citzen INT,
+	senior_citzen TINYINT(1),
 	partner VARCHAR (3),
 	dependents VARCHAR (3),
 	tenure INT,
@@ -71,17 +70,23 @@ CREATE TABLE bronze_erp_customer_info_churn (
 DROP TABLE IF EXISTS `bronze_crm_interaction_info`; -- Drop the table if it exists and build from scratch
 CREATE TABLE bronze_crm_interaction_info (
 	call_id VARCHAR(6),
+    agent VARCHAR(10),
 	date DATE,
 	time TIME,
-	topic VARCHAR(25),
+	wrap_up_code VARCHAR(25),
+    channel VARCHAR(3),
 	answered VARCHAR(1),
 	resolved VARCHAR(1),
 	speed_of_answer INT,
 	aht_hhmmss TIME,
 	avg_handling_time INT,
-	csat INT
+	csat INT,
+    agent_score
 );
 
+/* clear existing data and reloads with any new data since last load */
+TRUNCATE TABLE bronze_erp_customer_info_churn;
+TRUNCATE TABLE bronze_crm_interaction_info;
 
 /* Load data from local desktop into the database */
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- nested folders on MacOS fixed via symlink on command line
@@ -89,6 +94,16 @@ LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- neste
     FIELDS TERMINATED BY ","
     LINES TERMINATED BY "\n"
     IGNORE 1 LINES; -- first row has headers so ignore
+    
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" -- nested folders on MacOS fixed via symlink on command line
+	INTO TABLE bronze_crm_interaction_info
+    FIELDS TERMINATED BY ","
+    LINES TERMINATED BY "\n"
+    IGNORE 1 LINES; -- first row has headers so ignore
 
-SHOW VARIABLES LIKE 'local_infile'; -- check local infile permissions exist
+/* checks */
+SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists
+SELECT COUNT(*) FROM bronze_erp_customer_info_churn; -- count rows
+SELECT COUNT(*) FROM bronze_crm_interaction_info; -- count rows
 SELECT * FROM bronze_erp_customer_info_churn LIMIT 20; -- return loaded data
+SELECT * FROM bronze_crm_interaction_info LIMIT 20; -- return loaded data

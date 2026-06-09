@@ -66,31 +66,44 @@ CREATE TABLE bronze_erp_customer_info_churn (
 	churn VARCHAR (3)
 );
 
+DROP TABLE IF EXISTS `bronze_erp_agent_info`; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze_erp_agent_info (
+	agent_id VARCHAR(15),
+    first_name VARCHAR(20),
+    last_name VARCHAR(20),
+	hire_date DATE
+);
+
 /* create table for interaction details in bronze layer. Since the data is client-facing, we will use the crm prefix. */
 DROP TABLE IF EXISTS `bronze_crm_interaction_info`; -- Drop the table if it exists and build from scratch
 CREATE TABLE bronze_crm_interaction_info (
-	call_id VARCHAR(6),
-    agent VARCHAR(10),
-	date DATE,
-	time TIME,
-	wrap_up_code VARCHAR(25),
-    channel VARCHAR(3),
-	answered VARCHAR(1),
-	resolved VARCHAR(1),
-	speed_of_answer INT,
-	aht_hhmmss TIME,
-	avg_handling_time INT,
-	csat INT,
-    agent_score
+	call_id VARCHAR(7),
+    agent_id VARCHAR(10),
+    date DATE,
+    time TIME,
+    wrap_up_code VARCHAR (25),
+    answered TINYINT(1),
+    resolved TINYINT(1),
+    speed_pf_answer INT(6),
+    aht_hhmmss TIME,
+    aht_secs INT(6),
+    agent_score INT(1)
 );
 
 /* clear existing data and reloads with any new data since last load */
 TRUNCATE TABLE bronze_erp_customer_info_churn;
+TRUNCATE TABLE bronze_erp_agent_info;
 TRUNCATE TABLE bronze_crm_interaction_info;
 
 /* Load data from local desktop into the database */
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- nested folders on MacOS fixed via symlink on command line
 	INTO TABLE bronze_erp_customer_info_churn
+    FIELDS TERMINATED BY ","
+    LINES TERMINATED BY "\n"
+    IGNORE 1 LINES; -- first row has headers so ignore
+    
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/agent_info.csv" -- nested folders on MacOS fixed via symlink on command line
+	INTO TABLE bronze_erp_agent_info
     FIELDS TERMINATED BY ","
     LINES TERMINATED BY "\n"
     IGNORE 1 LINES; -- first row has headers so ignore
@@ -105,5 +118,7 @@ LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" -- nested f
 SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists
 SELECT COUNT(*) FROM bronze_erp_customer_info_churn; -- count rows
 SELECT COUNT(*) FROM bronze_crm_interaction_info; -- count rows
+SELECT COUNT(*) FROM bronze_erp_agent_info; -- count rows
 SELECT * FROM bronze_erp_customer_info_churn LIMIT 20; -- return loaded data
 SELECT * FROM bronze_crm_interaction_info LIMIT 20; -- return loaded data
+SELECT * FROM bronze_erp_agent_info LIMIT 20; -- return loaded data

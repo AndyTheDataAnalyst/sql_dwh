@@ -21,12 +21,13 @@ CREATE DATABASE DataWarehouse; -- Create data warehouse
 =============================================
 UPDATED QUERY
 =============================================
-In this update, we have dropped (and removed from the script) the tables that were previously named "bronze" because we are unable to create a table within a table in MySQL Workbench. So instead, we will need to create several tables that are prefixed with "bronze" to differentiate the different layers.
+In this update, we are going to nest two schemas (database and layer) within one another using multi-schema isolation: DataWarehouse and Bronze 
 
-We are currently working with two tables within the bronze layer, named the exact way the table was provided to us by the client.
+We are currently working with thre tables within the bronze layer, named the exact way the table was provided to us by the client.
 Client provided tables are:
 	- customer_info : sensitive customer-related information also containing their churn rate
     - interaction_info : call details that contain basic call center KPIs and metrics
+    - agent_info: agent information
     
 WARNING: This query will drop your tables if they already exist in your database and rebuild them from scratch!
 
@@ -35,15 +36,14 @@ WARNING: This query will drop your tables if they already exist in your database
 
 USE DataWarehouse; -- enter the DataWarehouse schema.
 
-DROP TABLE IF EXISTS bronze; -- drop the bronze table we created before if it hasn't been removed already.
+CREATE SCHEMA IF NOT EXISTS bronze;
 
--- create table for customer_info_churn in DataWarehouse Schema. Since the data is MOSTLY for internal business operations and contains sensitive details like customer names, invoices, and billing, we will use the erp prefix.
-
-DROP TABLE IF EXISTS `bronze_erp_customer_info_churn`; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze_erp_customer_info_churn (
+/* create crm/erp tables in bronze layer. */
+DROP TABLE IF EXISTS bronze.erp_customer_info_churn; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.erp_customer_info_churn (
 	customer_ID INT,
 	gender VARCHAR(8),
-	senior_citzen TINYINT(1),
+	senior_citzen TINYINT,
 	partner VARCHAR (3),
 	dependents VARCHAR (3),
 	tenure INT,
@@ -65,54 +65,61 @@ CREATE TABLE bronze_erp_customer_info_churn (
 	num_of_tech_tickets INT,
 	churn VARCHAR (3)
 );
-
-DROP TABLE IF EXISTS `bronze_erp_agent_info`; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze_erp_agent_info (
+DROP TABLE IF EXISTS bronze.erp_agent_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.erp_agent_info (
 	agent_id VARCHAR(15),
     first_name VARCHAR(20),
     last_name VARCHAR(20),
 	hire_date DATE
 );
-
-/* create table for interaction details in bronze layer. Since the data is client-facing, we will use the crm prefix. */
-DROP TABLE IF EXISTS `bronze_crm_interaction_info`; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze_crm_interaction_info (
+DROP TABLE IF EXISTS bronze.crm_interaction_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.crm_interaction_info (
 	call_id VARCHAR(7),
     agent_id VARCHAR(10),
     date DATE,
     time TIME,
     wrap_up_code VARCHAR (25),
-    answered TINYINT(1),
-    resolved TINYINT(1),
-    speed_pf_answer INT(6),
+    answered TINYINT,
+    resolved TINYINT,
+    speed_pf_answer INT,
     aht_hhmmss TIME,
-    aht_secs INT(6),
-    agent_score INT(1)
+    aht_secs INT,
+    agent_score INT
 );
 
-/* clear existing data and reloads with any new data since last load */
-TRUNCATE TABLE bronze_erp_customer_info_churn;
-TRUNCATE TABLE bronze_erp_agent_info;
-TRUNCATE TABLE bronze_crm_interaction_info;
+/* stored procedure */
+USE bronze;
 
-/* Load data from local desktop into the database */
+DROP PROCEDURE IF EXISTS load_bronze;
+
+DELIMITER $$
+CREATE PROCEDURE load_bronze()
+BEGIN
+    TRUNCATE TABLE bronze.erp_customer_info_churn;
+    TRUNCATE TABLE bronze.erp_agent_info;
+    TRUNCATE TABLE bronze.crm_interaction_info;
+END $$
+DELIMITER ;
+
+/* Clear existing data and load data from local desktop into the database */
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- nested folders on MacOS fixed via symlink on command line
 	INTO TABLE bronze_erp_customer_info_churn
-    FIELDS TERMINATED BY ","
-    LINES TERMINATED BY "\n"
-    IGNORE 1 LINES; -- first row has headers so ignore
+	FIELDS TERMINATED BY ","
+	LINES TERMINATED BY "\n"
+	IGNORE 1 LINES; -- first row has headers so ignore
+        
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" -- nested folders on MacOS fixed via symlink on command line
+	INTO TABLE bronze_crm_interaction_info
+	FIELDS TERMINATED BY ","
+	LINES TERMINATED BY "\n"
+	IGNORE 1 LINES; -- first row has headers so ignore
     
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/agent_info.csv" -- nested folders on MacOS fixed via symlink on command line
 	INTO TABLE bronze_erp_agent_info
-    FIELDS TERMINATED BY ","
-    LINES TERMINATED BY "\n"
-    IGNORE 1 LINES; -- first row has headers so ignore
-    
-LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" -- nested folders on MacOS fixed via symlink on command line
-	INTO TABLE bronze_crm_interaction_info
-    FIELDS TERMINATED BY ","
-    LINES TERMINATED BY "\n"
-    IGNORE 1 LINES; -- first row has headers so ignore
+	FIELDS TERMINATED BY ","
+	LINES TERMINATED BY "\n"
+	IGNORE 1 LINES; -- first row has headers so ignore
+
 
 /* checks */
 SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists

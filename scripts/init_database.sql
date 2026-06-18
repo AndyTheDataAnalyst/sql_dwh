@@ -102,28 +102,27 @@ BEGIN
 
 	-- If OFF, stop manually
 	IF @local_infile = 0 THEN
-		SELECT 'ERROR: local_infile is OFF. Aborting load.' AS msg;
+		SELECT "ERROR: local_infile is OFF. Aborting load." AS msg;
 		-- STOP HERE
 	END IF;
 
-	SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists
+	SHOW VARIABLES LIKE "local_infile"; -- check local infile exists
     
-	SELECT "=== lLOADING BRONZE LAYER ===" AS msg;
-    SELECT "=== TRUNCATING TABLES ===" AS msg;
+	SELECT ">> lLOADING BRONZE LAYER" AS msg;
+    SELECT ">> TRUNCATING TABLES" AS msg;
     TRUNCATE TABLE bronze.erp_customer_info_churn;
     TRUNCATE TABLE bronze.crm_interaction_info;
     
-    SELECT "=== LOADING DATA ===" AS msg;
     
 END $$
 DELIMITER ;
 
  /* Clear existing data and load data from local desktop into the database via symlink */
 SELECT "bronze.erp_customer_info_churn (before load)" AS table_name;
-LOAD DATA LOCAL INFILE '/Users/sokchim/Desktop/customer_info_churn.csv'
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv"
     INTO TABLE bronze.erp_customer_info_churn
-    FIELDS TERMINATED BY ','
-    LINES TERMINATED BY '\n'
+    FIELDS TERMINATED BY ","
+    LINES TERMINATED BY "\n"
     IGNORE 1 LINES;
     SELECT COUNT(*) AS row_count FROM bronze.erp_customer_info_churn;
     
@@ -134,14 +133,6 @@ LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv"
 	LINES TERMINATED BY "\n"
 	IGNORE 1 LINES; -- first row has headers so ignore
     SELECT COUNT(*) FROM bronze.crm_interaction_info;
-    SELECT * FROM bronze.crm_interaction_info LIMIT 20;
-
-SELECT "bronze.erp.agent_info (before load)" AS table_name;
-LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/agent_info.csv"
-	INTO TABLE bronze.erp_agent_info
-	FIELDS TERMINATED BY ","
-	LINES TERMINATED BY "\n"
-	IGNORE 1 LINES; -- first row has headers so ignore
     
 /* show tables */    
 DROP PROCEDURE IF EXISTS show_bronze;
@@ -149,10 +140,35 @@ DROP PROCEDURE IF EXISTS show_bronze;
 DELIMITER $$
 CREATE PROCEDURE show_bronze()
 BEGIN
-    SELECT '=== TABLE: bronze.erp_customer_info_churn ===' AS table_name;
-    SELECT * FROM bronze.erp_customer_info_churn LIMIT 20;
+	DECLARE start_time DATETIME;
+    DECLARE end_time DATETIME;
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION -- stops on SQL error
+    BEGIN
+		SELECT " >> ERROR WHILE LOADING DATA" AS msg;
+        SELECT " >> ERROR MESSAGE = " + ERROR_MESSAGE();
+	END;
+    
+	SELECT ">>  LOADING DATA" AS msg;
+    
+    SET start_time = NOW();
+	SELECT "bronze.erp_customer_info_churn" AS table_name;
+	SELECT * FROM bronze.erp_customer_info_churn LIMIT 20;
+    SET end_time = now();
+    SELECT CONCAT(
+		'>> LOAD DURATION [erp_customer_info_churn] = ',
+		TIMESTAMPDIFF(SECOND, start_time, end_time),
+		' seconds.'
+	) AS msg;
 
-    SELECT '=== TABLE: bronze.crm_interaction_info ===' AS table_name;
-    SELECT * FROM bronze.crm_interaction_info LIMIT 20;
+	SET start_time = NOW();
+	SELECT "bronze.crm_interaction_info" AS table_name;
+	SELECT * FROM bronze.crm_interaction_info LIMIT 20;
+    SET end_time = NOW();
+    SELECT CONCAT(
+		'>> LOAD DURATION [crm_customer_info] = ',
+		TIMESTAMPDIFF(SECOND, start_time, end_time),
+		' seconds.'
+	) AS msg;
+    
 END $$
 DELIMITER ;

@@ -23,7 +23,7 @@ UPDATED QUERY
 =============================================
 In this update, we are going to nest two schemas (database and layer) within one another using multi-schema isolation: DataWarehouse and Bronze 
 
-We are currently working with thre tables within the bronze layer, named the exact way the table was provided to us by the client.
+We are currently working with three tables within the bronze layer, named the exact way the table was provided to us by the client.
 Client provided tables are:
 	- customer_info : sensitive customer-related information also containing their churn rate
     - interaction_info : call details that contain basic call center KPIs and metrics
@@ -49,7 +49,7 @@ CREATE TABLE bronze.erp_customer_info_churn (
 	tenure INT,
 	phone_service VARCHAR (3),
 	multiple_lines VARCHAR (20),
-	service_kind VARCHAR (20),
+	internet_service VARCHAR (20),
 	online_security VARCHAR (3),
 	online_backup VARCHAR (3),
 	device_protection VARCHAR (3),
@@ -95,37 +95,64 @@ DROP PROCEDURE IF EXISTS load_bronze;
 DELIMITER $$
 CREATE PROCEDURE load_bronze()
 BEGIN
+	/* checks */
+	SET @local_infile := (SELECT @@local_infile);
+
+	SELECT @local_infile AS local_infile_status;
+
+	-- If OFF, stop manually
+	IF @local_infile = 0 THEN
+		SELECT 'ERROR: local_infile is OFF. Aborting load.' AS msg;
+		-- STOP HERE
+	END IF;
+
+	SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists
+    
+	SELECT "=== lLOADING BRONZE LAYER ===" AS msg;
+    SELECT "=== TRUNCATING TABLES ===" AS msg;
     TRUNCATE TABLE bronze.erp_customer_info_churn;
-    TRUNCATE TABLE bronze.erp_agent_info;
     TRUNCATE TABLE bronze.crm_interaction_info;
+    
+    SELECT "=== LOADING DATA ===" AS msg;
+    
 END $$
 DELIMITER ;
 
-/* Clear existing data and load data from local desktop into the database */
-LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv" -- nested folders on MacOS fixed via symlink on command line
-	INTO TABLE bronze_erp_customer_info_churn
+ /* Clear existing data and load data from local desktop into the database via symlink */
+SELECT "bronze.erp_customer_info_churn (before load)" AS table_name;
+LOAD DATA LOCAL INFILE '/Users/sokchim/Desktop/customer_info_churn.csv'
+    INTO TABLE bronze.erp_customer_info_churn
+    FIELDS TERMINATED BY ','
+    LINES TERMINATED BY '\n'
+    IGNORE 1 LINES;
+    SELECT COUNT(*) AS row_count FROM bronze.erp_customer_info_churn;
+    
+SELECT "bronze.erp_interaction_info (before load)" AS table_name;
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" 
+	INTO TABLE bronze.crm_interaction_info
 	FIELDS TERMINATED BY ","
 	LINES TERMINATED BY "\n"
 	IGNORE 1 LINES; -- first row has headers so ignore
-        
-LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" -- nested folders on MacOS fixed via symlink on command line
-	INTO TABLE bronze_crm_interaction_info
+    SELECT COUNT(*) FROM bronze.crm_interaction_info;
+    SELECT * FROM bronze.crm_interaction_info LIMIT 20;
+
+SELECT "bronze.erp.agent_info (before load)" AS table_name;
+LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/agent_info.csv"
+	INTO TABLE bronze.erp_agent_info
 	FIELDS TERMINATED BY ","
 	LINES TERMINATED BY "\n"
 	IGNORE 1 LINES; -- first row has headers so ignore
     
-LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/agent_info.csv" -- nested folders on MacOS fixed via symlink on command line
-	INTO TABLE bronze_erp_agent_info
-	FIELDS TERMINATED BY ","
-	LINES TERMINATED BY "\n"
-	IGNORE 1 LINES; -- first row has headers so ignore
+/* show tables */    
+DROP PROCEDURE IF EXISTS show_bronze;
 
+DELIMITER $$
+CREATE PROCEDURE show_bronze()
+BEGIN
+    SELECT '=== TABLE: bronze.erp_customer_info_churn ===' AS table_name;
+    SELECT * FROM bronze.erp_customer_info_churn LIMIT 20;
 
-/* checks */
-SHOW VARIABLES LIKE 'local_infile'; -- check local infile exists
-SELECT COUNT(*) FROM bronze_erp_customer_info_churn; -- count rows
-SELECT COUNT(*) FROM bronze_crm_interaction_info; -- count rows
-SELECT COUNT(*) FROM bronze_erp_agent_info; -- count rows
-SELECT * FROM bronze_erp_customer_info_churn LIMIT 20; -- return loaded data
-SELECT * FROM bronze_crm_interaction_info LIMIT 20; -- return loaded data
-SELECT * FROM bronze_erp_agent_info LIMIT 20; -- return loaded data
+    SELECT '=== TABLE: bronze.crm_interaction_info ===' AS table_name;
+    SELECT * FROM bronze.crm_interaction_info LIMIT 20;
+END $$
+DELIMITER ;

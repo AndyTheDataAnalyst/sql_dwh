@@ -38,9 +38,9 @@ USE DataWarehouse; -- enter the DataWarehouse schema.
 
 CREATE SCHEMA IF NOT EXISTS bronze;
 
-/* create crm/erp tables in bronze layer. */
-DROP TABLE IF EXISTS bronze.erp_customer_info_churn; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.erp_customer_info_churn (
+/* create crm tables in bronze layer. */
+DROP TABLE IF EXISTS bronze.crm_customer_info_churn; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.crm_customer_info_churn (
 	customer_ID INT,
 	gender VARCHAR(8),
 	senior_citzen TINYINT,
@@ -65,8 +65,8 @@ CREATE TABLE bronze.erp_customer_info_churn (
 	num_of_tech_tickets INT,
 	churn VARCHAR (3)
 );
-DROP TABLE IF EXISTS bronze.erp_agent_info; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.erp_agent_info (
+DROP TABLE IF EXISTS bronze.crm_agent_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.crm_agent_info (
 	agent_id VARCHAR(15),
     first_name VARCHAR(20),
     last_name VARCHAR(20),
@@ -110,7 +110,7 @@ BEGIN
     
 	SELECT ">> lLOADING BRONZE LAYER" AS msg;
     SELECT ">> TRUNCATING TABLES" AS msg;
-    TRUNCATE TABLE bronze.erp_customer_info_churn;
+    TRUNCATE TABLE bronze.crm_customer_info_churn;
     TRUNCATE TABLE bronze.crm_interaction_info;
     
     
@@ -118,15 +118,15 @@ END $$
 DELIMITER ;
 
  /* Clear existing data and load data from local desktop into the database via symlink */
-SELECT "bronze.erp_customer_info_churn (before load)" AS table_name;
+SELECT "bronze.crm_customer_info_churn (before load)" AS table_name;
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv"
-    INTO TABLE bronze.erp_customer_info_churn
+    INTO TABLE bronze.crm_customer_info_churn
     FIELDS TERMINATED BY ","
     LINES TERMINATED BY "\n"
     IGNORE 1 LINES;
-    SELECT COUNT(*) AS row_count FROM bronze.erp_customer_info_churn;
+    SELECT COUNT(*) AS row_count FROM bronze.crm_customer_info_churn;
     
-SELECT "bronze.erp_interaction_info (before load)" AS table_name;
+SELECT "bronze.crm_interaction_info (before load)" AS table_name;
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" 
 	INTO TABLE bronze.crm_interaction_info
 	FIELDS TERMINATED BY ","
@@ -151,11 +151,11 @@ BEGIN
 	SELECT ">>  LOADING DATA" AS msg;
     
     SET start_time = NOW();
-	SELECT "bronze.erp_customer_info_churn" AS table_name;
-	SELECT * FROM bronze.erp_customer_info_churn LIMIT 20;
+	SELECT "bronze.crm_customer_info_churn" AS table_name;
+	SELECT * FROM bronze.crm_customer_info_churn LIMIT 20;
     SET end_time = now();
     SELECT CONCAT(
-		'>> LOAD DURATION [erp_customer_info_churn] = ',
+		'>> LOAD DURATION [crm_customer_info_churn] = ',
 		TIMESTAMPDIFF(SECOND, start_time, end_time),
 		' seconds.'
 	) AS msg;

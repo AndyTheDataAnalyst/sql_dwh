@@ -65,14 +65,15 @@ CREATE TABLE bronze.crm_customer_info_churn (
 	num_of_tech_tickets INT,
 	churn VARCHAR (3)
 );
-DROP TABLE IF EXISTS bronze.crm_agent_info; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.crm_agent_info (
+DROP TABLE IF EXISTS bronze.erp_agent_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE bronze.erp_agent_info (
 	agent_id VARCHAR(15),
     first_name VARCHAR(20),
     last_name VARCHAR(20),
-	hire_date DATE
+	hire_date DATE,
+    departure_date DATE
 );
-DROP TABLE IF EXISTS bronze.crm_interaction_info; -- Drop the table if it exists and build from scratch
+DROP TABLE IF EXISTS bronze.erp_interaction_info; -- Drop the table if it exists and build from scratch
 CREATE TABLE bronze.crm_interaction_info (
 	call_id VARCHAR(7),
     agent_id VARCHAR(10),

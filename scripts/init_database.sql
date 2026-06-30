@@ -73,7 +73,7 @@ CREATE TABLE bronze.erp_agent_info (
 	hire_date DATE,
     departure_date DATE
 );
-DROP TABLE IF EXISTS bronze.erp_interaction_info; -- Drop the table if it exists and build from scratch
+DROP TABLE IF EXISTS bronze.crm_interaction_info; -- Drop the table if it exists and build from scratch
 CREATE TABLE bronze.crm_interaction_info (
 	call_id VARCHAR(7),
     agent_id VARCHAR(10),
@@ -164,6 +164,16 @@ BEGIN
 	SET start_time = NOW();
 	SELECT "bronze.crm_interaction_info" AS table_name;
 	SELECT * FROM bronze.crm_interaction_info LIMIT 20;
+    SET end_time = NOW();
+    SELECT CONCAT(
+		'>> LOAD DURATION [crm_customer_info] = ',
+		TIMESTAMPDIFF(SECOND, start_time, end_time),
+		' seconds.'
+	) AS msg;
+
+	SET start_time = NOW();
+	SELECT "bronze.erp_agent_info" AS table_name;
+	SELECT * FROM bronze.erp_agent_info LIMIT 20;
     SET end_time = NOW();
     SELECT CONCAT(
 		'>> LOAD DURATION [crm_customer_info] = ',

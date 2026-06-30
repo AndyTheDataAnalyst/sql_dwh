@@ -3,45 +3,24 @@
 Database and Schemas
 ==========================================
 Purpose: 
-	This script checks whether the "DataWarehouse" database already exists. If it does, it gets dropped and rebuilt from scratch.
+	In this query, we are building the silver layer, and dropping any schemas that ma exist with the same name.
 
 WARNING: 
 	Running this script will drop the entire "DataWarehouse" database if it already exists and ALL EXISTING DATA WILL BE DELETED!
 */
 
-
-USE master;
-
 DROP DATABASE IF EXISTS DataWarehouse; -- Drop the database if it already exists
-
 CREATE DATABASE DataWarehouse; -- Create data warehouse
-
-
-/* 
-=============================================
-UPDATED QUERY
-=============================================
-In this update, we are going to nest two schemas (database and layer) within one another using multi-schema isolation: DataWarehouse and Bronze 
-
-We are currently working with three tables within the bronze layer, named the exact way the table was provided to us by the client.
-Client provided tables are:
-	- customer_info : sensitive customer-related information also containing their churn rate
-    - interaction_info : call details that contain basic call center KPIs and metrics
-    - agent_info: agent information
-    
-WARNING: This query will drop your tables if they already exist in your database and rebuild them from scratch!
-
-*/
-
-
 USE DataWarehouse; -- enter the DataWarehouse schema.
 
-CREATE SCHEMA IF NOT EXISTS bronze;
+CREATE SCHEMA IF NOT EXISTS silver;
 
-/* create crm tables in bronze layer. */
-DROP TABLE IF EXISTS bronze.crm_customer_info_churn; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.crm_customer_info_churn (
+/* create crm tables in silver layer. */
+DROP TABLE IF EXISTS silver.crm_customer_info_churn; -- Drop the table if it exists and build from scratch
+CREATE TABLE silver.crm_customer_info_churn (
 	customer_ID INT,
+    first_name VARCHAR(20),
+    last_name VARCHAR(20),
 	gender VARCHAR(8),
 	senior_citzen TINYINT,
 	partner VARCHAR (3),
@@ -63,18 +42,23 @@ CREATE TABLE bronze.crm_customer_info_churn (
 	total_charges DECIMAL,
 	num_of_admin_tickets INT,
 	num_of_tech_tickets INT,
-	churn VARCHAR (3)
+	churn VARCHAR (3),
+    create_date DATE,
+    dwh_create_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-DROP TABLE IF EXISTS bronze.erp_agent_info; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.erp_agent_info (
+DROP TABLE IF EXISTS silver.erp_agent_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE silver.erp_agent_info (
 	agent_id VARCHAR(15),
     first_name VARCHAR(20),
     last_name VARCHAR(20),
 	hire_date DATE,
-    departure_date DATE
+    departure_date DATE,
+    create_date DATE,
+    dwh_create_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-DROP TABLE IF EXISTS bronze.crm_interaction_info; -- Drop the table if it exists and build from scratch
-CREATE TABLE bronze.crm_interaction_info (
+
+DROP TABLE IF EXISTS silver.crm_interaction_info; -- Drop the table if it exists and build from scratch
+CREATE TABLE silver.crm_interaction_info (
 	call_id VARCHAR(7),
     agent_id VARCHAR(10),
     date DATE,
@@ -85,16 +69,18 @@ CREATE TABLE bronze.crm_interaction_info (
     speed_pf_answer INT,
     aht_hhmmss TIME,
     aht_secs INT,
-    agent_score INT
+    agent_score INT,
+    create_date DATE,
+    dwh_create_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 /* stored procedure */
-USE bronze;
+USE silver;
 
-DROP PROCEDURE IF EXISTS load_bronze;
+DROP PROCEDURE IF EXISTS load_silver;
 
 DELIMITER $$
-CREATE PROCEDURE load_bronze()
+CREATE PROCEDURE load_silver()
 BEGIN
 	/* checks */
 	SET @local_infile := (SELECT @@local_infile);
@@ -109,37 +95,36 @@ BEGIN
 
 	SHOW VARIABLES LIKE "local_infile"; -- check local infile exists
     
-	SELECT ">> lLOADING BRONZE LAYER" AS msg;
+	SELECT ">> lLOADING SILVER LAYER" AS msg;
     SELECT ">> TRUNCATING TABLES" AS msg;
-    TRUNCATE TABLE bronze.crm_customer_info_churn;
-    TRUNCATE TABLE bronze.crm_interaction_info;
-    
+    TRUNCATE TABLE silver.crm_customer_info_churn;
+    TRUNCATE TABLE silver.crm_interaction_info;
     
 END $$
 DELIMITER ;
 
  /* Clear existing data and load data from local desktop into the database via symlink */
-SELECT "bronze.crm_customer_info_churn (before load)" AS table_name;
+SELECT "silver.crm_customer_info_churn (before load)" AS table_name;
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/customer_info_churn.csv"
-    INTO TABLE bronze.crm_customer_info_churn
+    INTO TABLE silver.crm_customer_info_churn
     FIELDS TERMINATED BY ","
     LINES TERMINATED BY "\n"
     IGNORE 1 LINES;
-    SELECT COUNT(*) AS row_count FROM bronze.crm_customer_info_churn;
+    SELECT COUNT(*) AS row_count FROM silver.crm_customer_info_churn;
     
-SELECT "bronze.crm_interaction_info (before load)" AS table_name;
+SELECT "silver.crm_interaction_info (before load)" AS table_name;
 LOAD DATA LOCAL INFILE "/Users/sokchim/Desktop/interaction_info.csv" 
-	INTO TABLE bronze.crm_interaction_info
+	INTO TABLE silver.crm_interaction_info
 	FIELDS TERMINATED BY ","
 	LINES TERMINATED BY "\n"
 	IGNORE 1 LINES; -- first row has headers so ignore
-    SELECT COUNT(*) FROM bronze.crm_interaction_info;
+    SELECT COUNT(*) FROM silver.crm_interaction_info;
     
 /* show tables */    
-DROP PROCEDURE IF EXISTS show_bronze;
+DROP PROCEDURE IF EXISTS show_silver;
 
 DELIMITER $$
-CREATE PROCEDURE show_bronze()
+CREATE PROCEDURE show_silver()
 BEGIN
 	DECLARE start_time DATETIME;
     DECLARE end_time DATETIME;
@@ -152,8 +137,8 @@ BEGIN
 	SELECT ">>  LOADING DATA" AS msg;
     
     SET start_time = NOW();
-	SELECT "bronze.crm_customer_info_churn" AS table_name;
-	SELECT * FROM bronze.crm_customer_info_churn LIMIT 20;
+	SELECT "silver.crm_customer_info_churn" AS table_name;
+	SELECT * FROM silver.crm_customer_info_churn LIMIT 20;
     SET end_time = now();
     SELECT CONCAT(
 		'>> LOAD DURATION [crm_customer_info_churn] = ',
@@ -162,18 +147,8 @@ BEGIN
 	) AS msg;
 
 	SET start_time = NOW();
-	SELECT "bronze.crm_interaction_info" AS table_name;
-	SELECT * FROM bronze.crm_interaction_info LIMIT 20;
-    SET end_time = NOW();
-    SELECT CONCAT(
-		'>> LOAD DURATION [crm_customer_info] = ',
-		TIMESTAMPDIFF(SECOND, start_time, end_time),
-		' seconds.'
-	) AS msg;
-
-	SET start_time = NOW();
-	SELECT "bronze.erp_agent_info" AS table_name;
-	SELECT * FROM bronze.erp_agent_info LIMIT 20;
+	SELECT "silver.crm_interaction_info" AS table_name;
+	SELECT * FROM silver.crm_interaction_info LIMIT 20;
     SET end_time = NOW();
     SELECT CONCAT(
 		'>> LOAD DURATION [crm_customer_info] = ',
